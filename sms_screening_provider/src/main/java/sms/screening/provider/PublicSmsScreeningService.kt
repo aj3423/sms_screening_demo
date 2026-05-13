@@ -16,8 +16,10 @@ class PublicSmsScreeningService : Service() {
         private const val logTag = "PublicSmsScreening"
     }
 
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     private val messenger = Messenger(
-        Handler(Looper.getMainLooper()) { message ->
+        Handler(mainHandler.looper) { message ->
             when (message.what) {
                 PublicSmsScreeningProtocol.messageQueryShouldBlock -> {
                     handleQuery(message)
@@ -67,10 +69,7 @@ class PublicSmsScreeningService : Service() {
                 logTag,
                 "Delaying response for ${ScreeningRules.timeoutSimulationDelayMillis} ms to simulate timeout."
             )
-            Handler(Looper.getMainLooper()).postDelayed(
-                sendResult,
-                ScreeningRules.timeoutSimulationDelayMillis,
-            )
+            mainHandler.postDelayed(sendResult, ScreeningRules.timeoutSimulationDelayMillis)
         } else {
             sendResult.run()
         }

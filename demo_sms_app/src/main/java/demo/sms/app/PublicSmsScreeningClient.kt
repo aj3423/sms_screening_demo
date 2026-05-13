@@ -17,10 +17,9 @@ import android.os.RemoteException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
-const val TIMEOUT = 5_000L
+private const val replyTimeoutMillis = 5_000L
 
 sealed interface ScreeningQueryResult {
     data class Success(
@@ -35,29 +34,17 @@ data class InstalledScreeningProvider(
     val label: String,
     val packageName: String,
     val serviceName: String,
-)
+) {
+    val componentName: ComponentName
+        get() = ComponentName(packageName, serviceName)
+}
 
 class PublicSmsScreeningClient(
     private val context: Context,
 ) {
     fun listAvailableProviders(): List<InstalledScreeningProvider> {
         return context.packageManager.queryPublicScreeningProviders()
-            .map { resolveInfo ->
-                val serviceInfo = resolveInfo.serviceInfo
-                InstalledScreeningProvider(
-                    label = resolveInfo.loadLabel(context.packageManager)
-                        .toString()
-                        .takeIf { it.isNotBlank() }
-                        ?: serviceInfo.packageName,
-                    packageName = serviceInfo.packageName,
-                    serviceName = serviceInfo.name,
-                )
-            }
-            .sortedWith(
-                compareBy<InstalledScreeningProvider> { it.label.lowercase() }
-                    .thenBy { it.packageName }
-                    .thenBy { it.serviceName }
-            )
+            .map { it.toInstalledScreeningProvider(context.packageManager) }
     }
 
     suspend fun shouldBlock(
@@ -65,33 +52,30 @@ class PublicSmsScreeningClient(
         smsContent: String,
         simSlot: Int,
     ): ScreeningQueryResult = withContext(Dispatchers.Main.immediate) {
-        suspendCancellableCoroutine { continuation ->
-            val resolveInfo = context.packageManager.queryPublicScreeningProviders().firstOrNull()
-            if (resolveInfo == null) {
-                continuation.resume(
-                    ScreeningQueryResult.Failure("No public SMS screening provider app was found.")
-                )
-                return@suspendCancellableCoroutine
-            }
+        val provider = listAvailableProviders().firstOrNull()
+            ?: return@withContext ScreeningQueryResult.Failure(
+                "No public SMS screening provider app was found."
+            )
 
-            val serviceInfo = resolveInfo.serviceInfo
-            val providerLabel = resolveInfo.loadLabel(context.packageManager)
-                .toString()
-                .takeIf { it.isNotBlank() }
-                ?: serviceInfo.packageName
+        suspendCancellableCoroutine<ScreeningQueryResult> { continuation ->
             val mainHandler = Handler(Looper.getMainLooper())
-            val bound = AtomicBoolean(false)
-            val completed = AtomicBoolean(false)
+            var isBound = false
+            var isCompleted = false
             lateinit var connection: ServiceConnection
 
             fun complete(result: ScreeningQueryResult) {
-                if (completed.compareAndSet(false, true) && continuation.isActive) {
+                if (isCompleted) {
+                    return
+                }
+                isCompleted = true
+                if (continuation.isActive) {
                     continuation.resume(result)
                 }
             }
 
             fun unbindIfNeeded() {
-                if (bound.compareAndSet(true, false)) {
+                if (isBound) {
+                    isBound = false
                     context.unbindService(connection)
                 }
             }
@@ -99,7 +83,7 @@ class PublicSmsScreeningClient(
             val timeout = Runnable {
                 unbindIfNeeded()
                 complete(
-                    ScreeningQueryResult.Failure("The screening provider did not reply in $TIMEOUT seconds.")
+                    ScreeningQueryResult.Failure("The screening provider did not reply in 5 seconds.")
                 )
             }
 
@@ -116,7 +100,7 @@ class PublicSmsScreeningClient(
                             complete(
                                 ScreeningQueryResult.Success(
                                     blocked = blocked,
-                                    providerLabel = providerLabel,
+                                    providerLabel = provider.label,
                                 )
                             )
                             true
@@ -152,7 +136,7 @@ class PublicSmsScreeningClient(
 
                     try {
                         Messenger(service).send(request)
-                        mainHandler.postDelayed(timeout, TIMEOUT)
+                        mainHandler.postDelayed(timeout, replyTimeoutMillis)
                     } catch (_: RemoteException) {
                         unbindIfNeeded()
                         complete(
@@ -186,7 +170,7 @@ class PublicSmsScreeningClient(
             }
 
             val explicitIntent = Intent(PublicSmsScreeningProtocol.action).apply {
-                component = ComponentName(serviceInfo.packageName, serviceInfo.name)
+                component = provider.componentName
             }
             val didBind = try {
                 context.bindService(explicitIntent, connection, Context.BIND_AUTO_CREATE)
@@ -198,8 +182,8 @@ class PublicSmsScreeningClient(
             }
 
             if (didBind) {
-                bound.set(true)
-            } else if (!completed.get()) {
+                isBound = true
+            } else if (!isCompleted) {
                 complete(
                     ScreeningQueryResult.Failure("Failed to bind to the screening provider.")
                 )
@@ -218,4 +202,18 @@ private fun PackageManager.queryPublicScreeningProviders(): List<ResolveInfo> {
     }
 
     return services.filter { it.serviceInfo?.exported == true }
+}
+
+private fun ResolveInfo.toInstalledScreeningProvider(
+    packageManager: PackageManager,
+): InstalledScreeningProvider {
+    val resolvedServiceInfo = serviceInfo
+    return InstalledScreeningProvider(
+        label = loadLabel(packageManager)
+            .toString()
+            .takeIf { it.isNotBlank() }
+            ?: resolvedServiceInfo.packageName,
+        packageName = resolvedServiceInfo.packageName,
+        serviceName = resolvedServiceInfo.name,
+    )
 }
