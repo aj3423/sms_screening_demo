@@ -70,6 +70,7 @@ private fun SmsSimulatorScreen(
     var smsContent by remember { mutableStateOf("") }
     var simSlot by remember { mutableStateOf(SimSlot.SIM_1) }
     var queryResult by remember { mutableStateOf<ScreeningQueryResult?>(null) }
+    var queriedProviderLabel by remember { mutableStateOf<String?>(null) }
     var availableProviders by remember {
         mutableStateOf(screeningClient.listAvailableProviders())
     }
@@ -135,6 +136,7 @@ private fun SmsSimulatorScreen(
             onClick = {
                 scope.launch {
                     isLoading = true
+                    queriedProviderLabel = availableProviders.firstOrNull()?.label
                     queryResult = screeningClient.shouldBlock(
                         number = number,
                         smsContent = smsContent.ifBlank { null },
@@ -162,6 +164,7 @@ private fun SmsSimulatorScreen(
             queryResult != null -> {
                 ScreeningResultCard(
                     result = queryResult!!,
+                    providerLabel = queriedProviderLabel,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -226,6 +229,7 @@ private fun AvailableProvidersCard(
 @Composable
 private fun ScreeningResultCard(
     result: ScreeningQueryResult,
+    providerLabel: String?,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -244,15 +248,27 @@ private fun ScreeningResultCard(
                 }
 
                 is ScreeningQueryResult.Success -> {
-                    Text(
-                        text = "Provider: ${result.providerLabel}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
+                    providerLabel?.let {
+                        Text(
+                            text = "Provider: $it",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     Text(
                         text = if (result.blocked) "Blocked = true" else "Blocked = false",
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                    Text(
+                        text = "Confidence = ${result.confidence}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    result.blockReason?.let { reason ->
+                        Text(
+                            text = "Reason: $reason",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
         }

@@ -24,7 +24,8 @@ private const val replyTimeoutMillis = 5_000L
 sealed interface ScreeningQueryResult {
     data class Success(
         val blocked: Boolean,
-        val providerLabel: String,
+        val blockReason: String?,
+        val confidence: Int,
     ) : ScreeningQueryResult
 
     data class Failure(val message: String) : ScreeningQueryResult
@@ -96,15 +97,14 @@ class Client(
                     mainHandler.removeCallbacks(timeout)
                     when (message.what) {
                         Protocol.messageScreeningResult -> {
-                            val blocked = message.data?.getBoolean(
-                                Protocol.keyBlocked,
-                                false,
-                            ) ?: false
+                            val responseData = message.data
                             unbindIfNeeded()
                             complete(
                                 ScreeningQueryResult.Success(
-                                    blocked = blocked,
-                                    providerLabel = provider.label,
+                                    blocked = responseData?.getBoolean(Protocol.keyBlocked, false) ?: false,
+                                    blockReason = responseData?.getString(Protocol.keyBlockReason),
+                                    confidence = (responseData?.getInt(Protocol.keyConfidence, 0) ?: 0)
+                                        .coerceIn(0, 100),
                                 )
                             )
                             true

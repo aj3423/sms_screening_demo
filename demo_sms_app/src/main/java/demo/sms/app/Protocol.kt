@@ -11,5 +11,7 @@ object Protocol {
     const val keySmsContent = "smsContent"
     const val keySimSlot = "simSlot"
     const val keyBlocked = "blocked"
+    const val keyBlockReason = "blockReason"
+    const val keyConfidence = "confidence"
     const val keyErrorMessage = "errorMessage"
 }

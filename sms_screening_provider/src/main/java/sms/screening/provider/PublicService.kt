@@ -40,7 +40,7 @@ class PublicService : Service() {
         val simSlot = requestData.takeIf {
             it.containsKey(Protocol.keySimSlot)
         }?.getInt(Protocol.keySimSlot)
-        val blocked = ScreeningRules.shouldBlock(
+        val decision = ScreeningRules.shouldBlock(
             number = number,
             smsContent = smsContent,
             simSlot = simSlot,
@@ -56,7 +56,9 @@ class PublicService : Service() {
                 Protocol.messageScreeningResult,
             ).apply {
                 data = Bundle().apply {
-                    putBoolean(Protocol.keyBlocked, blocked)
+                    putBoolean(Protocol.keyBlocked, decision.blocked)
+                    putString(Protocol.keyBlockReason, decision.blockReason)
+                    putInt(Protocol.keyConfidence, decision.confidence)
                 }
             }
 
