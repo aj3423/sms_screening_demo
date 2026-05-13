@@ -1,0 +1,87 @@
+name: new_release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag (for example v1.0.0)"
+        required: true
+        type: string
+      release_name:
+        description: "Release title"
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "oracle"
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Resolve release metadata
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            echo "TAG_NAME=${{ inputs.tag_name }}" >> "$GITHUB_ENV"
+            RELEASE_NAME="${{ inputs.release_name }}"
+            if [ -z "$RELEASE_NAME" ]; then
+              RELEASE_NAME="${{ inputs.tag_name }}"
+            fi
+          else
+            echo "TAG_NAME=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+            RELEASE_NAME="${GITHUB_REF_NAME}"
+          fi
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> "$GITHUB_ENV"
+
+      - name: Decode Keystore
+        env:
+          ENCODED_STRING: ${{ secrets.ANDROID_SIGNING_KEY }}
+        run: |
+          echo "$ENCODED_STRING" > "$RUNNER_TEMP/keystore-b64.txt"
+          base64 -d "$RUNNER_TEMP/keystore-b64.txt" > "$RUNNER_TEMP/release-keystore.jks"
+
+      - name: Build release APKs
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release-keystore.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :demo_sms_app:assembleRelease :sms_screening_provider:assembleRelease
+
+      - name: Collect release artifacts
+        run: |
+          mkdir -p release-artifacts
+          cp demo_sms_app/build/outputs/apk/release/demo_sms_app-release.apk \
+            release-artifacts/demo_sms_app-release.apk
+          cp sms_screening_provider/build/outputs/apk/release/sms_screening_provider-release.apk \
+            release-artifacts/sms_screening_provider-release.apk
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: false
+          token: "${{ secrets.SYNC_TOKEN }}"
+          preserve_order: true
+          name: "${{ env.RELEASE_NAME }}"
+          tag_name: "${{ env.TAG_NAME }}"
+          generate_release_notes: true
+          files: |
+            release-artifacts/demo_sms_app-release.apk
+            release-artifacts/sms_screening_provider-release.apk
