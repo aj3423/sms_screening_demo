@@ -84,10 +84,6 @@ private fun SmsSimulatorScreen(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
         )
-        Text(
-            text = "Simulate a new SMS and query a public screening provider through bindService() + Messenger.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
         OutlinedTextField(
             value = number,
             onValueChange = { number = it },
@@ -100,34 +96,38 @@ private fun SmsSimulatorScreen(
             onValueChange = { smsContent = it },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("SMS Content") },
-            minLines = 4,
+            minLines = 2,
         )
-        Text(
-            text = "SIM Slot",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        SimSlot.entries.forEach { option ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .selectable(
+        Row {
+            Text(
+                text = "SIM Slot",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(end = 60.dp)
+            )
+            SimSlot.entries.forEach { option ->
+                Row(
+                    modifier = Modifier
+//                        .fillMaxWidth()
+                        .selectable(
+                            selected = simSlot == option,
+                            onClick = { simSlot = option },
+                            role = Role.RadioButton,
+                        ),
+//                        .padding(vertical = 4.dp),
+//                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
                         selected = simSlot == option,
-                        onClick = { simSlot = option },
-                        role = Role.RadioButton,
+                        onClick = null,
                     )
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(
-                    selected = simSlot == option,
-                    onClick = null,
-                )
-                Text(
-                    text = option.label,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
+                    Text(
+                        text = option.label,
+//                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
         }
+
         Button(
             onClick = {
                 scope.launch {
