@@ -64,7 +64,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: false
-          token: "${{ secrets.SYNC_TOKEN }}"
           preserve_order: true
           name: "test"
           tag_name: "test"
@@ -72,3 +71,5 @@ jobs:
           files: |
             release-artifacts/demo_sms_app-release.apk
             release-artifacts/sms_screening_provider-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
