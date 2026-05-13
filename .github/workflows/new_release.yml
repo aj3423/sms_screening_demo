@@ -42,10 +42,23 @@ jobs:
       - name: Collect release artifacts
         run: |
           mkdir -p release-artifacts
-          cp demo_sms_app/build/outputs/apk/release/demo_sms_app-release.apk \
-            release-artifacts/demo_sms_app-release.apk
-          cp sms_screening_provider/build/outputs/apk/release/sms_screening_provider-release.apk \
-            release-artifacts/sms_screening_provider-release.apk
+          DEMO_APK="$(find demo_sms_app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | sort | tail -n 1)"
+          PROVIDER_APK="$(find sms_screening_provider/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | sort | tail -n 1)"
+
+          if [ -z "$DEMO_APK" ]; then
+            echo "demo_sms_app release APK not found"
+            find demo_sms_app/build/outputs -maxdepth 4 -type f | sort || true
+            exit 1
+          fi
+
+          if [ -z "$PROVIDER_APK" ]; then
+            echo "sms_screening_provider release APK not found"
+            find sms_screening_provider/build/outputs -maxdepth 4 -type f | sort || true
+            exit 1
+          fi
+
+          cp "$DEMO_APK" release-artifacts/demo_sms_app-release.apk
+          cp "$PROVIDER_APK" release-artifacts/sms_screening_provider-release.apk
 
       - name: Release
         uses: softprops/action-gh-release@v2
