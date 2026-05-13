@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -69,6 +70,9 @@ private fun SmsSimulatorScreen(
     var smsContent by remember { mutableStateOf("") }
     var simSlot by remember { mutableStateOf(SimSlot.SIM_1) }
     var queryResult by remember { mutableStateOf<ScreeningQueryResult?>(null) }
+    var availableProviders by remember {
+        mutableStateOf(screeningClient.listAvailableProviders())
+    }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -83,6 +87,11 @@ private fun SmsSimulatorScreen(
             text = "Demo SMS App",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
+        )
+        AvailableProvidersCard(
+            providers = availableProviders,
+            onRefresh = { availableProviders = screeningClient.listAvailableProviders() },
+            modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = number,
@@ -104,26 +113,20 @@ private fun SmsSimulatorScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(end = 60.dp)
             )
-            SimSlot.entries.forEach { option ->
+            SimSlot.entries.forEach {
                 Row(
                     modifier = Modifier
-//                        .fillMaxWidth()
                         .selectable(
-                            selected = simSlot == option,
-                            onClick = { simSlot = option },
+                            selected = simSlot == it,
+                            onClick = { simSlot = it },
                             role = Role.RadioButton,
-                        ),
-//                        .padding(vertical = 4.dp),
-//                    verticalAlignment = Alignment.CenterVertically,
+                        )
                 ) {
                     RadioButton(
-                        selected = simSlot == option,
+                        selected = simSlot == it,
                         onClick = null,
                     )
-                    Text(
-                        text = option.label,
-//                        modifier = Modifier.padding(start = 8.dp),
-                    )
+                    Text(text = it.label)
                 }
             }
         }
@@ -161,6 +164,60 @@ private fun SmsSimulatorScreen(
                     result = queryResult!!,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AvailableProvidersCard(
+    providers: List<InstalledScreeningProvider>,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Available providers (${providers.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Button(onClick = onRefresh) {
+                    Text("Refresh")
+                }
+            }
+
+            if (providers.isEmpty()) {
+                Text("No installed app currently exposes the public screening service.")
+            } else {
+                providers.forEachIndexed { index, provider ->
+                    if (index > 0) {
+                        HorizontalDivider()
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = provider.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = provider.packageName,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = provider.serviceName,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             }
         }
     }

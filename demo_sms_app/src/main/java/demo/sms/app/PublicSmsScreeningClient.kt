@@ -29,16 +29,42 @@ sealed interface ScreeningQueryResult {
     data class Failure(val message: String) : ScreeningQueryResult
 }
 
+data class InstalledScreeningProvider(
+    val label: String,
+    val packageName: String,
+    val serviceName: String,
+)
+
 class PublicSmsScreeningClient(
     private val context: Context,
 ) {
+    fun listAvailableProviders(): List<InstalledScreeningProvider> {
+        return context.packageManager.queryPublicScreeningProviders()
+            .map { resolveInfo ->
+                val serviceInfo = resolveInfo.serviceInfo
+                InstalledScreeningProvider(
+                    label = resolveInfo.loadLabel(context.packageManager)
+                        .toString()
+                        .takeIf { it.isNotBlank() }
+                        ?: serviceInfo.packageName,
+                    packageName = serviceInfo.packageName,
+                    serviceName = serviceInfo.name,
+                )
+            }
+            .sortedWith(
+                compareBy<InstalledScreeningProvider> { it.label.lowercase() }
+                    .thenBy { it.packageName }
+                    .thenBy { it.serviceName }
+            )
+    }
+
     suspend fun shouldBlock(
         number: String,
         smsContent: String,
         simSlot: Int,
     ): ScreeningQueryResult = withContext(Dispatchers.Main.immediate) {
         suspendCancellableCoroutine { continuation ->
-            val resolveInfo = context.packageManager.findPublicScreeningProvider()
+            val resolveInfo = context.packageManager.queryPublicScreeningProviders().firstOrNull()
             if (resolveInfo == null) {
                 continuation.resume(
                     ScreeningQueryResult.Failure("No public SMS screening provider app was found.")
@@ -180,7 +206,7 @@ class PublicSmsScreeningClient(
     }
 }
 
-private fun PackageManager.findPublicScreeningProvider(): ResolveInfo? {
+private fun PackageManager.queryPublicScreeningProviders(): List<ResolveInfo> {
     val intent = Intent(PublicSmsScreeningProtocol.action)
     val services = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         queryIntentServices(intent, PackageManager.ResolveInfoFlags.of(0))
@@ -189,5 +215,5 @@ private fun PackageManager.findPublicScreeningProvider(): ResolveInfo? {
         queryIntentServices(intent, 0)
     }
 
-    return services.firstOrNull { it.serviceInfo?.exported == true }
+    return services.filter { it.serviceInfo?.exported == true }
 }
