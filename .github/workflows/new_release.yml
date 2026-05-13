@@ -67,7 +67,6 @@ jobs:
           preserve_order: true
           name: "test"
           tag_name: "test"
-          generate_release_notes: true
           files: |
             release-artifacts/demo_sms_app-release.apk
             release-artifacts/sms_screening_provider-release.apk
