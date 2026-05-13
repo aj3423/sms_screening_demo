@@ -1,6 +1,9 @@
 package sms.screening.provider
 
 object ScreeningRules {
+    const val timeoutSimulationNumber = "6000"
+    const val timeoutSimulationDelayMillis = 6_000L
+
     fun shouldBlock(
         number: String?,
         smsContent: String?,
@@ -16,6 +19,10 @@ object ScreeningRules {
             return true
         }
         return false
+    }
+
+    fun shouldSimulateTimeout(number: String?): Boolean {
+        return number.orEmpty().filter(Char::isDigit) == timeoutSimulationNumber
     }
 
     private fun isEvenNumber(number: String?): Boolean {

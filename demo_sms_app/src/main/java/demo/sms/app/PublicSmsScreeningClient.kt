@@ -20,6 +20,8 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
+const val TIMEOUT = 5_000L
+
 sealed interface ScreeningQueryResult {
     data class Success(
         val blocked: Boolean,
@@ -97,11 +99,11 @@ class PublicSmsScreeningClient(
             val timeout = Runnable {
                 unbindIfNeeded()
                 complete(
-                    ScreeningQueryResult.Failure("The screening provider did not reply in time.")
+                    ScreeningQueryResult.Failure("The screening provider did not reply in $TIMEOUT seconds.")
                 )
             }
 
-            val replyMessenger = Messenger(
+            val replyTo = Messenger(
                 Handler(Looper.getMainLooper()) { message ->
                     mainHandler.removeCallbacks(timeout)
                     when (message.what) {
@@ -140,7 +142,7 @@ class PublicSmsScreeningClient(
                         null,
                         PublicSmsScreeningProtocol.messageQueryShouldBlock,
                     ).apply {
-                        replyTo = replyMessenger
+                        this.replyTo = replyTo
                         data = Bundle().apply {
                             putString(PublicSmsScreeningProtocol.keyNumber, number)
                             putString(PublicSmsScreeningProtocol.keySmsContent, smsContent)
@@ -150,7 +152,7 @@ class PublicSmsScreeningClient(
 
                     try {
                         Messenger(service).send(request)
-                        mainHandler.postDelayed(timeout, 5_000)
+                        mainHandler.postDelayed(timeout, TIMEOUT)
                     } catch (_: RemoteException) {
                         unbindIfNeeded()
                         complete(

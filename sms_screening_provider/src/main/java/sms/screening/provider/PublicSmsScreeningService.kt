@@ -32,28 +32,47 @@ class PublicSmsScreeningService : Service() {
     override fun onBind(intent: Intent): IBinder = messenger.binder
 
     private fun handleQuery(message: Message) {
+        val number = message.data?.getString(PublicSmsScreeningProtocol.keyNumber)
+        val smsContent = message.data?.getString(PublicSmsScreeningProtocol.keySmsContent)
+        val simSlot = message.data?.getInt(PublicSmsScreeningProtocol.keySimSlot, 1) ?: 1
         val blocked = ScreeningRules.shouldBlock(
-            number = message.data?.getString(PublicSmsScreeningProtocol.keyNumber),
-            smsContent = message.data?.getString(PublicSmsScreeningProtocol.keySmsContent),
-            simSlot = message.data?.getInt(PublicSmsScreeningProtocol.keySimSlot, 1) ?: 1,
+            number = number,
+            smsContent = smsContent,
+            simSlot = simSlot,
         )
         val replyMessenger = message.replyTo ?: run {
             Log.w(logTag, "Ignoring screening query without reply messenger.")
             return
         }
-        val response = Message.obtain(
-            null,
-            PublicSmsScreeningProtocol.messageScreeningResult,
-        ).apply {
-            data = Bundle().apply {
-                putBoolean(PublicSmsScreeningProtocol.keyBlocked, blocked)
+
+        val sendResult = Runnable {
+            val response = Message.obtain(
+                null,
+                PublicSmsScreeningProtocol.messageScreeningResult,
+            ).apply {
+                data = Bundle().apply {
+                    putBoolean(PublicSmsScreeningProtocol.keyBlocked, blocked)
+                }
+            }
+
+            try {
+                replyMessenger.send(response)
+            } catch (_: RemoteException) {
+                Log.w(logTag, "Failed to deliver screening result to caller.")
             }
         }
 
-        try {
-            replyMessenger.send(response)
-        } catch (_: RemoteException) {
-            Log.w(logTag, "Failed to deliver screening result to caller.")
+        if (ScreeningRules.shouldSimulateTimeout(number)) {
+            Log.i(
+                logTag,
+                "Delaying response for ${ScreeningRules.timeoutSimulationDelayMillis} ms to simulate timeout."
+            )
+            Handler(Looper.getMainLooper()).postDelayed(
+                sendResult,
+                ScreeningRules.timeoutSimulationDelayMillis,
+            )
+        } else {
+            sendResult.run()
         }
     }
 }

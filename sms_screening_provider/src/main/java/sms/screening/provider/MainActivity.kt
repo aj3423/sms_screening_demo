@@ -53,6 +53,7 @@ private fun ProviderStatusScreen(modifier: Modifier = Modifier) {
             Text("- Even phone number -> block")
             Text("- SIM slot 2 -> block")
             Text("- SMS content containing \"spam\" -> block")
+            Text("- Phone number 6000 -> timeout")
             Text("- Otherwise -> allow")
         }
     }
