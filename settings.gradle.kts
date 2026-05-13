@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "SMS Screening Demo"
-include(":app")
+include(":demo_sms_app")
+include(":sms_screening_provider")

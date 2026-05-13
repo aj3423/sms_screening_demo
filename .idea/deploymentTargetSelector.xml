@@ -2,7 +2,11 @@
 <project version="4">
   <component name="deploymentTargetSelector">
     <selectionStates>
-      <SelectionState runConfigName="app">
+      <SelectionState runConfigName="sms_screening_provider">
+        <option name="selectionMode" value="DROPDOWN" />
+        <DialogSelection />
+      </SelectionState>
+      <SelectionState runConfigName="demo_sms_app">
         <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
