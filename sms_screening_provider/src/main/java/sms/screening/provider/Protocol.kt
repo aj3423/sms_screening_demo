@@ -1,6 +1,6 @@
 package sms.screening.provider
 
-object PublicSmsScreeningProtocol {
+object Protocol {
 
     const val messageQueryShouldBlock = 1
     const val messageScreeningResult = 2

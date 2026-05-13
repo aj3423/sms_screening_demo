@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
             SMSScreeningDemoTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     SmsSimulatorScreen(
-                        screeningClient = PublicSmsScreeningClient(applicationContext),
+                        screeningClient = Client(applicationContext),
                         modifier = Modifier
                             .padding(innerPadding)
                             .statusBarsPadding()
@@ -63,7 +63,7 @@ private enum class SimSlot(val label: String, val value: Int) {
 
 @Composable
 private fun SmsSimulatorScreen(
-    screeningClient: PublicSmsScreeningClient,
+    screeningClient: Client,
     modifier: Modifier = Modifier,
 ) {
     var number by remember { mutableStateOf("") }
@@ -137,14 +137,14 @@ private fun SmsSimulatorScreen(
                     isLoading = true
                     queryResult = screeningClient.shouldBlock(
                         number = number,
-                        smsContent = smsContent,
-                        simSlot = simSlot.value,
+                        smsContent = smsContent.ifBlank { null },
+                        simSlot = simSlot.value.takeIf { it > 0 },
                     )
                     isLoading = false
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading,
+            enabled = !isLoading && number.isNotBlank(),
         ) {
             Text("Simulate a new SMS")
         }

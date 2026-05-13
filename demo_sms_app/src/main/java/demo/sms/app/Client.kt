@@ -39,7 +39,7 @@ data class InstalledScreeningProvider(
         get() = ComponentName(packageName, serviceName)
 }
 
-class PublicSmsScreeningClient(
+class Client(
     private val context: Context,
 ) {
     fun listAvailableProviders(): List<InstalledScreeningProvider> {
@@ -49,9 +49,13 @@ class PublicSmsScreeningClient(
 
     suspend fun shouldBlock(
         number: String,
-        smsContent: String,
-        simSlot: Int,
+        smsContent: String?,
+        simSlot: Int?,
     ): ScreeningQueryResult = withContext(Dispatchers.Main.immediate) {
+        val normalizedNumber = number.trim()
+        if (normalizedNumber.isEmpty()) {
+            return@withContext ScreeningQueryResult.Failure("Number is required.")
+        }
         val provider = listAvailableProviders().firstOrNull()
             ?: return@withContext ScreeningQueryResult.Failure(
                 "No public SMS screening provider app was found."
@@ -91,9 +95,9 @@ class PublicSmsScreeningClient(
                 Handler(Looper.getMainLooper()) { message ->
                     mainHandler.removeCallbacks(timeout)
                     when (message.what) {
-                        PublicSmsScreeningProtocol.messageScreeningResult -> {
+                        Protocol.messageScreeningResult -> {
                             val blocked = message.data?.getBoolean(
-                                PublicSmsScreeningProtocol.keyBlocked,
+                                Protocol.keyBlocked,
                                 false,
                             ) ?: false
                             unbindIfNeeded()
@@ -106,9 +110,9 @@ class PublicSmsScreeningClient(
                             true
                         }
 
-                        PublicSmsScreeningProtocol.messageScreeningError -> {
+                        Protocol.messageScreeningError -> {
                             val errorMessage = message.data?.getString(
-                                PublicSmsScreeningProtocol.keyErrorMessage
+                                Protocol.keyErrorMessage
                             ) ?: "The screening provider returned an unknown error."
                             unbindIfNeeded()
                             complete(ScreeningQueryResult.Failure(errorMessage))
@@ -124,13 +128,17 @@ class PublicSmsScreeningClient(
                 override fun onServiceConnected(name: ComponentName, service: IBinder) {
                     val request = Message.obtain(
                         null,
-                        PublicSmsScreeningProtocol.messageQueryShouldBlock,
+                        Protocol.messageQueryShouldBlock,
                     ).apply {
                         this.replyTo = replyTo
                         data = Bundle().apply {
-                            putString(PublicSmsScreeningProtocol.keyNumber, number)
-                            putString(PublicSmsScreeningProtocol.keySmsContent, smsContent)
-                            putInt(PublicSmsScreeningProtocol.keySimSlot, simSlot)
+                            putString(Protocol.keyNumber, normalizedNumber)
+                            smsContent?.let {
+                                putString(Protocol.keySmsContent, it)
+                            }
+                            simSlot?.let {
+                                putInt(Protocol.keySimSlot, it)
+                            }
                         }
                     }
 
@@ -169,7 +177,7 @@ class PublicSmsScreeningClient(
                 }
             }
 
-            val explicitIntent = Intent(PublicSmsScreeningProtocol.action).apply {
+            val explicitIntent = Intent(Protocol.action).apply {
                 component = provider.componentName
             }
             val didBind = try {
@@ -193,7 +201,7 @@ class PublicSmsScreeningClient(
 }
 
 private fun PackageManager.queryPublicScreeningProviders(): List<ResolveInfo> {
-    val intent = Intent(PublicSmsScreeningProtocol.action)
+    val intent = Intent(Protocol.action)
     val services = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         queryIntentServices(intent, PackageManager.ResolveInfoFlags.of(0))
     } else {

@@ -21,7 +21,7 @@
         </activity>
 
         <service
-            android:name=".PublicSmsScreeningService"
+            android:name=".PublicService"
             android:exported="true">
             <intent-filter>
                 <action android:name="sms.screening.provider.PublicSMSScreeningService" />

@@ -1,6 +1,6 @@
 package demo.sms.app
 
-object PublicSmsScreeningProtocol {
+object Protocol {
     const val action = "sms.screening.provider.PublicSMSScreeningService"
 
     const val messageQueryShouldBlock = 1

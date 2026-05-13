@@ -11,7 +11,7 @@ import android.os.Message
 import android.os.Messenger
 import android.os.RemoteException
 
-class PublicSmsScreeningService : Service() {
+class PublicService : Service() {
     companion object {
         private const val logTag = "PublicSmsScreening"
     }
@@ -21,7 +21,7 @@ class PublicSmsScreeningService : Service() {
     private val messenger = Messenger(
         Handler(mainHandler.looper) { message ->
             when (message.what) {
-                PublicSmsScreeningProtocol.messageQueryShouldBlock -> {
+                Protocol.messageQueryShouldBlock -> {
                     handleQuery(message)
                     true
                 }
@@ -34,9 +34,12 @@ class PublicSmsScreeningService : Service() {
     override fun onBind(intent: Intent): IBinder = messenger.binder
 
     private fun handleQuery(message: Message) {
-        val number = message.data?.getString(PublicSmsScreeningProtocol.keyNumber)
-        val smsContent = message.data?.getString(PublicSmsScreeningProtocol.keySmsContent)
-        val simSlot = message.data?.getInt(PublicSmsScreeningProtocol.keySimSlot, 1) ?: 1
+        val requestData = message.data ?: Bundle.EMPTY
+        val number = requestData.getString(Protocol.keyNumber)
+        val smsContent = requestData.getString(Protocol.keySmsContent)
+        val simSlot = requestData.takeIf {
+            it.containsKey(Protocol.keySimSlot)
+        }?.getInt(Protocol.keySimSlot)
         val blocked = ScreeningRules.shouldBlock(
             number = number,
             smsContent = smsContent,
@@ -50,10 +53,10 @@ class PublicSmsScreeningService : Service() {
         val sendResult = Runnable {
             val response = Message.obtain(
                 null,
-                PublicSmsScreeningProtocol.messageScreeningResult,
+                Protocol.messageScreeningResult,
             ).apply {
                 data = Bundle().apply {
-                    putBoolean(PublicSmsScreeningProtocol.keyBlocked, blocked)
+                    putBoolean(Protocol.keyBlocked, blocked)
                 }
             }
 

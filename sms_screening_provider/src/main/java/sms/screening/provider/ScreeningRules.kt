@@ -7,7 +7,7 @@ object ScreeningRules {
     fun shouldBlock(
         number: String?,
         smsContent: String?,
-        simSlot: Int,
+        simSlot: Int?,
     ): Boolean {
         if (isEvenNumber(number)) {
             return true
