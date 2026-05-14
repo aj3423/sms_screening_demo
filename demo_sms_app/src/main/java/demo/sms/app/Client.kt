@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.PowerManager
 import android.os.RemoteException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -30,13 +31,26 @@ sealed interface ScreeningQueryResult {
     data class Failure(val message: String) : ScreeningQueryResult
 }
 
+data class ProviderStatus(
+    val componentName: ComponentName,
+    val isBatteryUnrestricted: Boolean,
+)
+
 class Client(
     private val context: Context,
 ) {
-    fun listAvailableProviders(): List<ComponentName> {
+    private val powerManager: PowerManager =
+        context.getSystemService(Context.POWER_SERVICE) as PowerManager
+
+    fun listAvailableProviders(): List<ProviderStatus> {
         return context.packageManager.queryPublicScreeningProviders()
             .mapNotNull { it.serviceInfo }
-            .map { ComponentName(it.packageName, it.name) }
+            .map {
+                ProviderStatus(
+                    componentName = ComponentName(it.packageName, it.name),
+                    isBatteryUnrestricted = powerManager.isIgnoringBatteryOptimizations(it.packageName),
+                )
+            }
     }
 
     suspend fun shouldBlock(
@@ -45,9 +59,6 @@ class Client(
         simSlot: Int?,
     ): ScreeningQueryResult = withContext(Dispatchers.Main.immediate) {
         val normalizedNumber = number.trim()
-        if (normalizedNumber.isEmpty()) {
-            return@withContext ScreeningQueryResult.Failure("Number is required.")
-        }
         val provider = listAvailableProviders().firstOrNull()
             ?: return@withContext ScreeningQueryResult.Failure(
                 "No public SMS screening provider app was found."
@@ -112,10 +123,9 @@ class Client(
                     ).apply {
                         this.replyTo = replyTo
                         data = Bundle().apply {
-							// Number must exist
-                            putString(Protocol.keyNumber, normalizedNumber)
-
-							// smsContent and simSlot are optional
+                            normalizedNumber.takeIf { it.isNotEmpty() }?.let {
+                                putString(Protocol.keyNumber, it)
+                            }
                             smsContent?.let {
                                 putString(Protocol.keySmsContent, it)
                             }
@@ -161,7 +171,7 @@ class Client(
             }
 
             val explicitIntent = Intent(Protocol.action).apply {
-                component = provider
+                component = provider.componentName
             }
             val didBind = try {
                 context.bindService(explicitIntent, connection, Context.BIND_AUTO_CREATE)

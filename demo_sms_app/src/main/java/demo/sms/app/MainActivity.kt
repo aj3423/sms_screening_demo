@@ -71,7 +71,7 @@ private fun SmsSimulatorScreen(
     var smsContent by remember { mutableStateOf("") }
     var simSlot by remember { mutableStateOf(SimSlot.SIM_1) }
     var queryResult by remember { mutableStateOf<ScreeningQueryResult?>(null) }
-    var queriedProviderPackageName by remember { mutableStateOf<String?>(null) }
+    var queriedProvider by remember { mutableStateOf<ProviderStatus?>(null) }
     var availableProviders by remember {
         mutableStateOf(screeningClient.listAvailableProviders())
     }
@@ -137,7 +137,7 @@ private fun SmsSimulatorScreen(
             onClick = {
                 scope.launch {
                     isLoading = true
-                    queriedProviderPackageName = availableProviders.firstOrNull()?.packageName
+                    queriedProvider = availableProviders.firstOrNull()
                     queryResult = screeningClient.shouldBlock(
                         number = number,
                         smsContent = smsContent.ifBlank { null },
@@ -147,7 +147,7 @@ private fun SmsSimulatorScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading && number.isNotBlank(),
+            enabled = true,
         ) {
             Text("Simulate a new SMS")
         }
@@ -165,7 +165,7 @@ private fun SmsSimulatorScreen(
             queryResult != null -> {
                 ScreeningResultCard(
                     result = queryResult!!,
-                    providerPackageName = queriedProviderPackageName,
+                    provider = queriedProvider,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -175,7 +175,7 @@ private fun SmsSimulatorScreen(
 
 @Composable
 private fun AvailableProvidersCard(
-    providers: List<ComponentName>,
+    providers: List<ProviderStatus>,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -208,13 +208,26 @@ private fun AvailableProvidersCard(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = provider.packageName,
+                            text = provider.componentName.packageName,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = provider.className,
+                            text = provider.componentName.className,
                             style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = if (provider.isBatteryUnrestricted) {
+                                "Battery: Unrestricted"
+                            } else {
+                                "Battery: Restricted"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (provider.isBatteryUnrestricted) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
                         )
                     }
                 }
@@ -226,7 +239,7 @@ private fun AvailableProvidersCard(
 @Composable
 private fun ScreeningResultCard(
     result: ScreeningQueryResult,
-    providerPackageName: String?,
+    provider: ProviderStatus?,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -245,9 +258,9 @@ private fun ScreeningResultCard(
                 }
 
                 is ScreeningQueryResult.Success -> {
-                    providerPackageName?.let {
+                    provider?.let {
                         Text(
-                            text = "Provider: $it",
+                            text = "Provider: ${it.componentName.packageName}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                         )
