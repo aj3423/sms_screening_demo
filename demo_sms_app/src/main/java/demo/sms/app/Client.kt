@@ -31,21 +31,13 @@ sealed interface ScreeningQueryResult {
     data class Failure(val message: String) : ScreeningQueryResult
 }
 
-data class InstalledScreeningProvider(
-    val label: String,
-    val packageName: String,
-    val serviceName: String,
-) {
-    val componentName: ComponentName
-        get() = ComponentName(packageName, serviceName)
-}
-
 class Client(
     private val context: Context,
 ) {
-    fun listAvailableProviders(): List<InstalledScreeningProvider> {
+    fun listAvailableProviders(): List<ComponentName> {
         return context.packageManager.queryPublicScreeningProviders()
-            .map { it.toInstalledScreeningProvider(context.packageManager) }
+            .mapNotNull { it.serviceInfo }
+            .map { ComponentName(it.packageName, it.name) }
     }
 
     suspend fun shouldBlock(
@@ -132,7 +124,10 @@ class Client(
                     ).apply {
                         this.replyTo = replyTo
                         data = Bundle().apply {
+							// Number must exist
                             putString(Protocol.keyNumber, normalizedNumber)
+
+							// smsContent and simSlot are optional
                             smsContent?.let {
                                 putString(Protocol.keySmsContent, it)
                             }
@@ -178,7 +173,7 @@ class Client(
             }
 
             val explicitIntent = Intent(Protocol.action).apply {
-                component = provider.componentName
+                component = provider
             }
             val didBind = try {
                 context.bindService(explicitIntent, connection, Context.BIND_AUTO_CREATE)
@@ -210,18 +205,4 @@ private fun PackageManager.queryPublicScreeningProviders(): List<ResolveInfo> {
     }
 
     return services.filter { it.serviceInfo?.exported == true }
-}
-
-private fun ResolveInfo.toInstalledScreeningProvider(
-    packageManager: PackageManager,
-): InstalledScreeningProvider {
-    val resolvedServiceInfo = serviceInfo
-    return InstalledScreeningProvider(
-        label = loadLabel(packageManager)
-            .toString()
-            .takeIf { it.isNotBlank() }
-            ?: resolvedServiceInfo.packageName,
-        packageName = resolvedServiceInfo.packageName,
-        serviceName = resolvedServiceInfo.name,
-    )
 }

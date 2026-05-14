@@ -1,5 +1,6 @@
 package demo.sms.app
 
+import android.content.ComponentName
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -70,7 +71,7 @@ private fun SmsSimulatorScreen(
     var smsContent by remember { mutableStateOf("") }
     var simSlot by remember { mutableStateOf(SimSlot.SIM_1) }
     var queryResult by remember { mutableStateOf<ScreeningQueryResult?>(null) }
-    var queriedProviderLabel by remember { mutableStateOf<String?>(null) }
+    var queriedProviderPackageName by remember { mutableStateOf<String?>(null) }
     var availableProviders by remember {
         mutableStateOf(screeningClient.listAvailableProviders())
     }
@@ -136,7 +137,7 @@ private fun SmsSimulatorScreen(
             onClick = {
                 scope.launch {
                     isLoading = true
-                    queriedProviderLabel = availableProviders.firstOrNull()?.label
+                    queriedProviderPackageName = availableProviders.firstOrNull()?.packageName
                     queryResult = screeningClient.shouldBlock(
                         number = number,
                         smsContent = smsContent.ifBlank { null },
@@ -164,7 +165,7 @@ private fun SmsSimulatorScreen(
             queryResult != null -> {
                 ScreeningResultCard(
                     result = queryResult!!,
-                    providerLabel = queriedProviderLabel,
+                    providerPackageName = queriedProviderPackageName,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -174,7 +175,7 @@ private fun SmsSimulatorScreen(
 
 @Composable
 private fun AvailableProvidersCard(
-    providers: List<InstalledScreeningProvider>,
+    providers: List<ComponentName>,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -207,17 +208,13 @@ private fun AvailableProvidersCard(
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = provider.label,
+                            text = provider.packageName,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = provider.packageName,
+                            text = provider.className,
                             style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Text(
-                            text = provider.serviceName,
-                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 }
@@ -229,7 +226,7 @@ private fun AvailableProvidersCard(
 @Composable
 private fun ScreeningResultCard(
     result: ScreeningQueryResult,
-    providerLabel: String?,
+    providerPackageName: String?,
     modifier: Modifier = Modifier,
 ) {
     Card(modifier = modifier) {
@@ -248,7 +245,7 @@ private fun ScreeningResultCard(
                 }
 
                 is ScreeningQueryResult.Success -> {
-                    providerLabel?.let {
+                    providerPackageName?.let {
                         Text(
                             text = "Provider: $it",
                             style = MaterialTheme.typography.titleMedium,
