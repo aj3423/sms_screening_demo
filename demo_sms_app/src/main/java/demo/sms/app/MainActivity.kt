@@ -256,10 +256,6 @@ private fun ScreeningResultCard(
                         text = if (result.blocked) "Blocked = true" else "Blocked = false",
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Text(
-                        text = "Confidence = ${result.confidence}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
                     result.blockReason?.let { reason ->
                         Text(
                             text = "Reason: $reason",

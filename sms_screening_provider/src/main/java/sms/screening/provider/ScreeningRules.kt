@@ -7,7 +7,6 @@ object ScreeningRules {
     data class Decision(
         val blocked: Boolean,
         val blockReason: String?,
-        val confidence: Int,
     )
 
     fun shouldBlock(
@@ -19,27 +18,23 @@ object ScreeningRules {
             return Decision(
                 blocked = true,
                 blockReason = "Even number",
-                confidence = 95,
             )
         }
         if (simSlot == 2) {
             return Decision(
                 blocked = true,
                 blockReason = "SIM slot 2",
-                confidence = 90,
             )
         }
         if (smsContent.orEmpty().contains("spam", ignoreCase = true)) {
             return Decision(
                 blocked = true,
-                blockReason = "Content contains spam",
-                confidence = 85,
+                blockReason = "Content contains `spam`",
             )
         }
         return Decision(
             blocked = false,
             blockReason = null,
-            confidence = 0,
         )
     }
 

@@ -56,9 +56,8 @@ class PublicService : Service() {
                 Protocol.messageScreeningResult,
             ).apply {
                 data = Bundle().apply {
-                    putBoolean(Protocol.keyBlocked, decision.blocked)
-                    putString(Protocol.keyBlockReason, decision.blockReason)
-                    putInt(Protocol.keyConfidence, decision.confidence)
+                    putBoolean(Protocol.keyShouldBlock, decision.blocked)
+                    putString(Protocol.keyReason, decision.blockReason)
                 }
             }
 

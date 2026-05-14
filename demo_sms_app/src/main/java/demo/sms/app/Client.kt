@@ -25,7 +25,6 @@ sealed interface ScreeningQueryResult {
     data class Success(
         val blocked: Boolean,
         val blockReason: String?,
-        val confidence: Int,
     ) : ScreeningQueryResult
 
     data class Failure(val message: String) : ScreeningQueryResult
@@ -93,21 +92,10 @@ class Client(
                             unbindIfNeeded()
                             complete(
                                 ScreeningQueryResult.Success(
-                                    blocked = responseData?.getBoolean(Protocol.keyBlocked, false) ?: false,
-                                    blockReason = responseData?.getString(Protocol.keyBlockReason),
-                                    confidence = (responseData?.getInt(Protocol.keyConfidence, 0) ?: 0)
-                                        .coerceIn(0, 100),
+                                    blocked = responseData?.getBoolean(Protocol.keyShouldBlock, false) ?: false,
+                                    blockReason = responseData?.getString(Protocol.keyReason),
                                 )
                             )
-                            true
-                        }
-
-                        Protocol.messageScreeningError -> {
-                            val errorMessage = message.data?.getString(
-                                Protocol.keyErrorMessage
-                            ) ?: "The screening provider returned an unknown error."
-                            unbindIfNeeded()
-                            complete(ScreeningQueryResult.Failure(errorMessage))
                             true
                         }
 
